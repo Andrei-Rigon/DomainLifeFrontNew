@@ -1,0 +1,128 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+/*
+ * Tokens de design do Domain Life.
+ * Tudo no app usa estas variáveis; para mudar o visual, mude aqui.
+ */
+:root {
+  /* superfícies e texto */
+  --canvas: #f7f8fa;
+  --surface: #ffffff;
+  --surface-soft: #fbfaf8;
+  --ink: #252a36;
+  --muted: #9298a5;
+  --line: #edeef1;
+  --line-strong: #dfe1e7;
+
+  /* marca */
+  --purple: #7161d8;
+  --purple-dark: #5749b8;
+  --purple-pale: #f0edff;
+  --sidebar: #25263b;
+  --sidebar-muted: #a2a3b6;
+
+  /* tons usados em ícones, status e gráficos */
+  --pos: #31936d;
+  --neg: #d47767;
+  --coral: #dc8974;
+  --coral-bg: #fff0ec;
+  --lilac: #8174d9;
+  --lilac-bg: #f0edff;
+  --mint: #4da77a;
+  --mint-bg: #eaf7ef;
+  --sun: #d39d44;
+  --sun-bg: #fff5df;
+  --warn: #bd8a35;
+  --warn-bg: #fff4df;
+
+  /* nomes antigos (usados pelas telas e componentes existentes) */
+  --color-bg: var(--canvas);
+  --color-card-bg: var(--surface);
+  --color-border: var(--line);
+  --color-border-strong: var(--line-strong);
+  --color-text: var(--ink);
+  --color-text-muted: var(--muted);
+  --color-accent: var(--purple);
+  --color-accent-soft: var(--purple-pale);
+  --color-danger: #d4574a;
+  --color-danger-soft: #fff0ec;
+
+  --radius-lg: 14px;
+  --radius-md: 11px;
+  --radius-sm: 8px;
+  --shadow-card: 0 1px 2px rgba(32, 32, 48, 0.04);
+  --shadow-pop: 0 12px 30px rgba(32, 32, 56, 0.14);
+
+  --font-body: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Manrope', 'DM Sans', system-ui, sans-serif;
+  font-family: var(--font-body);
+}
+
+:root[data-theme='dark'] {
+  --canvas: #171821;
+  --surface: #21232e;
+  --surface-soft: #252631;
+  --ink: #f0f0f5;
+  --muted: #a0a2b1;
+  --line: #353743;
+  --line-strong: #464859;
+
+  --purple: #a59af8;
+  --purple-dark: #b8afff;
+  --purple-pale: #302d48;
+  --sidebar: #12131b;
+
+  --pos: #69c39f;
+  --neg: #ef9a8a;
+  --coral: #ef9a8a;
+  --coral-bg: rgba(239, 154, 138, 0.15);
+  --lilac: #b4a9ff;
+  --lilac-bg: rgba(165, 154, 248, 0.16);
+  --mint: #69c39f;
+  --mint-bg: rgba(105, 195, 159, 0.15);
+  --sun: #e8bd6b;
+  --sun-bg: rgba(232, 189, 107, 0.15);
+  --warn: #e8bd6b;
+  --warn-bg: rgba(232, 189, 107, 0.16);
+
+  --color-danger: #f08c82;
+  --color-danger-soft: rgba(240, 140, 130, 0.16);
+  --shadow-card: none;
+  --shadow-pop: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+}

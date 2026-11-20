@@ -1,0 +1,59 @@
+/* Estilos próprios dos formulários financeiros (modais). O resto está em styles/ui.css. */
+.fin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fin-hint {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.fin-kind-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.fin-kind-btn {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fin-kind-btn--despesa.fin-kind-btn--active {
+  background: var(--coral-bg);
+  border-color: var(--neg);
+  color: var(--neg);
+}
+
+.fin-kind-btn--receita.fin-kind-btn--active {
+  background: var(--mint-bg);
+  border-color: var(--pos);
+  color: var(--pos);
+}
+
+.fin-color-picker {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fin-color-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.fin-color-dot--active {
+  border: 3px solid var(--ink);
+}

@@ -1,0 +1,237 @@
+.note-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.note-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-end;
+  margin-top: auto;
+  padding-top: 10px;
+  font-size: 11px;
+}
+
+/* ---------- Tipo 1: post-it ---------- */
+
+.note-postit {
+  --note-paper: color-mix(in srgb, var(--note-color) 30%, #ffffff);
+  --note-ink: color-mix(in srgb, var(--note-color) 55%, #1f2937);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 440px;
+  background: var(--note-paper);
+  color: #1f2937;
+  border-radius: 3px;
+  box-shadow: 0 10px 18px -8px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: transform 0.18s ease;
+}
+
+.notes-grid--postit > .note-postit:nth-child(4n + 1) {
+  transform: rotate(-1deg);
+}
+
+.notes-grid--postit > .note-postit:nth-child(4n + 2) {
+  transform: rotate(0.8deg);
+}
+
+.notes-grid--postit > .note-postit:nth-child(4n + 3) {
+  transform: rotate(-0.5deg);
+}
+
+.notes-grid--postit > .note-postit:nth-child(4n + 4) {
+  transform: rotate(1deg);
+}
+
+.note-postit:hover,
+.note-postit:focus-within {
+  transform: translateY(-3px) rotate(0deg) !important;
+  z-index: 5;
+}
+
+.note-postit-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--note-ink);
+}
+
+.note-postit-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.note-postit .icon-btn,
+.note-postit-icon {
+  color: var(--note-ink);
+}
+
+.note-postit-icon {
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.note-postit .icon-btn:hover,
+.note-postit-icon:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--note-ink);
+}
+
+.note-postit-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 6px;
+  padding: 10px 14px 12px;
+}
+
+/* Conteúdo maior que o post-it é cortado com um leve esmaecido; a nota inteira abre em tela cheia */
+.note-postit-body .md {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
+
+.note-postit .note-title {
+  color: #111827;
+}
+
+.note-postit .note-time {
+  color: var(--note-ink);
+  padding-right: 14px;
+}
+
+.note-postit-fold {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 22px;
+  height: 22px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--note-paper) 78%, #000000) 50%, var(--color-bg) 50%);
+  pointer-events: none;
+}
+
+/* ---------- Tipo 2: minimalista ---------- */
+
+.note-minimal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px 12px 19px;
+  overflow: visible;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--note-color) 7%, var(--color-card-bg));
+  border: 1px solid color-mix(in srgb, var(--note-color) 40%, var(--color-border));
+  border-radius: 14px;
+}
+
+.note-minimal::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--note-color);
+}
+
+.note-minimal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.note-minimal .note-title {
+  color: color-mix(in srgb, var(--note-color) 75%, #000000);
+}
+
+.note-minimal .note-time {
+  color: color-mix(in srgb, var(--note-color) 75%, #000000);
+}
+
+:root[data-theme='dark'] .note-minimal {
+  background: color-mix(in srgb, var(--note-color) 6%, var(--color-card-bg));
+  border-color: color-mix(in srgb, var(--note-color) 20%, var(--color-border));
+}
+
+:root[data-theme='dark'] .note-minimal::before {
+  opacity: 0.6;
+}
+
+:root[data-theme='dark'] .note-minimal .note-title,
+:root[data-theme='dark'] .note-minimal .note-time {
+  color: color-mix(in srgb, var(--note-color) 55%, #d1d5db);
+}
+
+.note-minimal-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* ---------- Visual suave (pastel, cantos arredondados) ---------- */
+.note-postit {
+  --note-paper: color-mix(in srgb, var(--note-color) 14%, #ffffff);
+  --note-ink: color-mix(in srgb, var(--note-color) 60%, #1f2937);
+  border: 1px solid color-mix(in srgb, var(--note-color) 28%, #ffffff);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(32, 32, 56, 0.05);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.notes-grid--postit > .note-postit:nth-child(n) {
+  transform: none;
+}
+
+.note-postit:hover,
+.note-postit:focus-within {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 10px 24px rgba(32, 32, 56, 0.1);
+}
+
+.note-postit-fold {
+  display: none;
+}
+
+.note-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+:root[data-theme='dark'] .note-postit {
+  --note-paper: color-mix(in srgb, var(--note-color) 22%, var(--surface));
+  --note-ink: color-mix(in srgb, var(--note-color) 55%, #ffffff);
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--note-color) 30%, var(--surface));
+}
+
+.note-minimal {
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .note-postit .note-title,
+:root[data-theme='dark'] .note-postit .note-time {
+  color: var(--ink);
+}
