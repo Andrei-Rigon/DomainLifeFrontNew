@@ -14,7 +14,7 @@ export interface Category {
 export interface CategoryPayload {
   nome: string;
   tipo?: CategoryKind;
-  cor?: string;
+  cor?: string | null; // null = tirar a cor na edição
 }
 
 export const listCategories = () => api.get<Category[]>('/categorias-financeiras?limit=200');
@@ -38,16 +38,19 @@ export interface Entry {
   forma_pagamento: PaymentMethod | null;
   origem: string;
   observacao: string | null;
+  contabilizar?: boolean; // false = fora do caixa (não entra em totais/saldo)
 }
 
+// Nos payloads, null = limpar o campo na edição (a API aceita null nesses campos).
 export interface EntryPayload {
   tipo: EntryKind;
   valor: number;
-  id_categoria?: number;
-  descricao?: string;
+  id_categoria?: number | null;
+  descricao?: string | null;
   data?: string;
-  forma_pagamento?: PaymentMethod;
-  observacao?: string;
+  forma_pagamento?: PaymentMethod | null;
+  observacao?: string | null;
+  contabilizar?: boolean;
 }
 
 export const listEntries = (params: { tipo?: string; id_categoria?: number; start?: string; end?: string }) =>
@@ -116,16 +119,18 @@ export interface Installment {
   data_vencimento: string;
   data_pagamento: string | null;
   status: InstallmentStatus;
+  contabilizar?: boolean;
 }
 
 export interface InstallmentPayload {
   id_count: number;
-  descricao?: string;
+  descricao?: string | null;
   numero_parcela?: number;
   valor_parcela: number;
-  valor_pago?: number;
+  valor_pago?: number | null;
   data_vencimento: string;
-  data_pagamento?: string;
+  data_pagamento?: string | null;
+  contabilizar?: boolean;
 }
 
 export const listInstallments = (params: { status?: string; start?: string; end?: string; id_count?: number }) =>
@@ -139,6 +144,7 @@ export const generateInstallments = (p: {
   data_primeiro_vencimento: string;
   qtde_parceladas?: number;
   valor_parcela?: number;
+  contabilizar?: boolean;
 }) => api.post<Installment[]>('/pagar/gerar', p);
 
 // -------------------------------------------------------------------- receber
@@ -155,15 +161,17 @@ export interface Receivable {
   data_vencimento: string;
   data_recebimento: string | null;
   status: ReceivableStatus;
+  contabilizar?: boolean;
 }
 
 export interface ReceivablePayload {
   descricao: string;
-  id_categoria?: number;
+  id_categoria?: number | null;
   valor: number;
-  valor_recebido?: number;
+  valor_recebido?: number | null;
   data_vencimento: string;
-  data_recebimento?: string;
+  data_recebimento?: string | null;
+  contabilizar?: boolean;
 }
 
 export const listReceivables = (params: { status?: string; start?: string; end?: string }) =>
@@ -177,6 +185,7 @@ export const generateReceivables = (p: {
   primeiro_vencimento: string;
   qtde?: number;
   id_categoria?: number;
+  contabilizar?: boolean;
 }) => api.post<Receivable[]>('/receber/gerar', p);
 
 // --------------------------------------------------------------------- perfil

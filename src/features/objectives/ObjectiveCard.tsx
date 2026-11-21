@@ -45,7 +45,8 @@ export function ObjectiveCard({ objective, onToggleChecked, onEdit, onDelete }: 
       <div className="goal-foot">
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
           <Calendar size={13} />
-          {isChecked ? `Concluído em ${formatDate(objective.prazo)}` : `Prazo: ${formatDate(objective.prazo)}`}
+          {/* A API não guarda a data de conclusão, então mostramos sempre o prazo. */}
+          {objective.prazo ? `Prazo: ${formatDate(objective.prazo)}` : 'Sem prazo'}
         </span>
         <button type="button" className="text-link" onClick={onToggleChecked}>
           {isChecked ? 'Reabrir' : 'Concluir'} →

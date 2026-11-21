@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, CalendarPlus, CreditCard, Wallet } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, CalendarPlus, CreditCard, Undo2, Wallet } from 'lucide-react';
 import { ActionMenu } from '../../components/ActionMenu';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { EmptyState, PageHeading } from '../../components/PageHeading';
-import { MonthPicker, StatusBadge } from './components';
+import { MonthPicker, OffCashTag, StatusBadge } from './components';
 import {
   GenerateModal,
   InstallmentFormModal,
+  SettleModal,
   type GenerateForm,
   type InstallmentForm,
+  type SettleForm,
   type InstallmentInitial,
   type InstallmentKind,
 } from './InstallmentModals';
@@ -26,7 +28,7 @@ import {
   updateReceivable,
 } from '../../api/finance';
 import { listCounts } from '../../api/counts';
-import { currentMonth, formatDateBR, formatMoney, monthRange, todayISO } from '../../lib/format';
+import { currentMonth, formatDateBR, formatMoney, monthRange } from '../../lib/format';
 import { useLoad } from '../../lib/useLoad';
 import { somar } from './math';
 import './finance.css';
@@ -41,6 +43,7 @@ interface Row {
   due: string;
   settledOn: string | null;
   status: string;
+  counted: boolean; // false = fora do caixa (a tela ainda soma; só o caixa ignora)
   initial: InstallmentInitial;
 }
 
@@ -54,7 +57,9 @@ const TEXT = {
     done: 'Paga',
     doneLabel: 'Pagas',
     action: 'Pagar',
+    undo: 'Desfazer pagamento',
     doneVerb: 'paga em',
+    doneTotal: 'Total pago neste mês',
     empty: 'Nenhuma parcela neste mês. Use "Gerar parcelas" para criar as de uma conta.',
   },
   receber: {
@@ -66,7 +71,9 @@ const TEXT = {
     done: 'Recebida',
     doneLabel: 'Recebidas',
     action: 'Receber',
+    undo: 'Desfazer recebimento',
     doneVerb: 'recebida em',
+    doneTotal: 'Total recebido neste mês',
     empty: 'Nenhuma cobrança neste mês. Use "Gerar cobranças" para criar as mensais.',
   },
 } as const;
@@ -86,6 +93,8 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
   const [form, setForm] = useState<{ row?: Row } | null>(null);
   const [generating, setGenerating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
+  const [settleTarget, setSettleTarget] = useState<Row | null>(null); // modal do botão "Pagar"/"Receber"
+  const [undoTarget, setUndoTarget] = useState<Row | null>(null); // confirmação do "Desfazer"
   const [actionError, setActionError] = useState<string | null>(null);
 
   const { start, end } = monthRange(month);
@@ -105,6 +114,7 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
         due: p.data_vencimento,
         settledOn: p.data_pagamento,
         status: p.status,
+        counted: p.contabilizar !== false,
         initial: {
           accountId: p.id_count,
           descricao: p.descricao ?? '',
@@ -112,6 +122,7 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
           vencimento: p.data_vencimento,
           baixa: p.valor_pago,
           dataBaixa: p.data_pagamento,
+          contabilizar: p.contabilizar !== false,
         },
       }));
     }
@@ -125,6 +136,7 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
       due: r.data_vencimento,
       settledOn: r.data_recebimento,
       status: r.status,
+      counted: r.contabilizar !== false,
       initial: {
         categoryId: r.id_categoria,
         descricao: r.descricao,
@@ -132,6 +144,7 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
         vencimento: r.data_vencimento,
         baixa: r.valor_recebido,
         dataBaixa: r.data_recebimento,
+        contabilizar: r.contabilizar !== false,
       },
     }));
   }, [kind, start, end]);
@@ -144,6 +157,16 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
   const open = somar(rows.filter((r) => r.status !== text.done).map((r) => r.value));
   const done = somar(rows.filter((r) => r.status === text.done).map((r) => r.settled ?? r.value));
 
+  // O número grande acompanha a aba: na aba "Pagas" mostra o total pago, e assim por diante.
+  const total =
+    status === text.done
+      ? { label: text.doneTotal, value: done }
+      : status === 'Pendente'
+        ? { label: 'Total pendente neste mês', value: open }
+        : status === 'Atrasada'
+          ? { label: 'Total atrasado neste mês', value: open }
+          : { label: text.totalLabel, value: open };
+
   const tabs = [
     { value: 'todos', label: 'Todas' },
     { value: 'Pendente', label: 'Pendentes' },
@@ -153,25 +176,30 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
 
   async function save(data: InstallmentForm) {
     const done = data.baixa !== undefined || data.dataBaixa !== undefined;
+    // Na edição, campo vazio vai como null para a API apagar o valor antigo.
+    // Assim dá para desfazer uma baixa apagando o valor pago/recebido.
+    const empty = form?.row ? null : undefined;
     if (kind === 'pagar') {
       const payload = {
         id_count: data.accountId as number,
-        descricao: data.descricao || undefined,
+        descricao: data.descricao || empty,
         valor_parcela: data.valor,
         data_vencimento: data.vencimento,
-        valor_pago: data.baixa,
-        data_pagamento: done ? data.dataBaixa : undefined,
+        valor_pago: data.baixa ?? empty,
+        data_pagamento: done ? data.dataBaixa : empty,
+        contabilizar: data.contabilizar,
       };
       if (form?.row) await updateInstallment(form.row.id, payload);
       else await createInstallment(payload);
     } else {
       const payload = {
         descricao: data.descricao,
-        id_categoria: data.categoryId,
+        id_categoria: data.categoryId ?? empty,
         valor: data.valor,
         data_vencimento: data.vencimento,
-        valor_recebido: data.baixa,
-        data_recebimento: done ? data.dataBaixa : undefined,
+        valor_recebido: data.baixa ?? empty,
+        data_recebimento: done ? data.dataBaixa : empty,
+        contabilizar: data.contabilizar,
       };
       if (form?.row) await updateReceivable(form.row.id, payload);
       else await createReceivable(payload);
@@ -186,6 +214,7 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
         data_primeiro_vencimento: data.primeiro,
         qtde_parceladas: data.qtde,
         valor_parcela: data.valor,
+        contabilizar: data.contabilizar,
       });
     } else {
       await generateReceivables({
@@ -194,20 +223,35 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
         primeiro_vencimento: data.primeiro,
         qtde: data.qtde,
         id_categoria: data.categoryId,
+        contabilizar: data.contabilizar,
       });
     }
     await items.reload();
   }
 
-  // Dá baixa no valor cheio, com data de hoje
-  async function settle(row: Row) {
+  /**
+   * Dá baixa com o valor e a data confirmados no modal. O valor da parcela passa a ser o
+   * valor pago: a conta deste mês veio com esse valor (luz e água mudam todo mês).
+   * Sem isso, pagar menos que o previsto deixava a parcela "Pendente" (parcial).
+   */
+  async function settle(row: Row, data: SettleForm) {
+    if (kind === 'pagar') {
+      await updateInstallment(row.id, { valor_parcela: data.valor, valor_pago: data.valor, data_pagamento: data.data });
+    } else {
+      await updateReceivable(row.id, { valor: data.valor, valor_recebido: data.valor, data_recebimento: data.data });
+    }
+    await items.reload();
+  }
+
+  /** Volta para pendente: apaga valor e data da baixa (a API recalcula Pendente/Atrasada). */
+  async function undo(row: Row) {
     setActionError(null);
     try {
-      if (kind === 'pagar') await updateInstallment(row.id, { valor_pago: row.value, data_pagamento: todayISO() });
-      else await updateReceivable(row.id, { valor_recebido: row.value, data_recebimento: todayISO() });
+      if (kind === 'pagar') await updateInstallment(row.id, { valor_pago: null, data_pagamento: null });
+      else await updateReceivable(row.id, { valor_recebido: null, data_recebimento: null });
       await items.reload();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Não foi possível dar baixa.');
+      setActionError(err instanceof Error ? err.message : 'Não foi possível desfazer.');
     }
   }
 
@@ -246,11 +290,13 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
           {kind === 'pagar' ? <ArrowUpRight size={17} /> : <ArrowDownLeft size={17} />}
         </span>
         <span>
-          {text.totalLabel}
-          <strong>{formatMoney(open)}</strong>
+          {total.label}
+          <strong>{formatMoney(total.value)}</strong>
         </span>
         <span className="bill-count">
-          {formatMoney(done)} {text.doneLabel.toLowerCase()} · {rows.length} no mês
+          {/* Na aba de pagas o total grande já é o pago; aqui fica só a contagem. */}
+          {status === text.done ? '' : `${formatMoney(done)} ${text.doneLabel.toLowerCase()} · `}
+          {rows.length} no mês
         </span>
       </div>
 
@@ -266,12 +312,13 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
         </div>
 
         {rows.map((row) => (
-          <div className="bill-row" key={row.id}>
+          <div className={`bill-row${row.counted ? '' : ' is-uncounted'}`} key={row.id}>
             <span className={`bill-icon ${kind === 'pagar' ? 'coral' : 'green'}`}>
               {kind === 'pagar' ? <CreditCard size={17} /> : <Wallet size={17} />}
             </span>
             <strong>
               {row.title}
+              {!row.counted && <OffCashTag />}
               <small>
                 {[
                   row.subtitle && !row.title.startsWith(row.subtitle) ? row.subtitle : null,
@@ -288,9 +335,13 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
               <StatusBadge status={row.status} />
             </span>
             <span className="bill-action">
-              {row.status !== text.done && (
-                <button type="button" className={row.status === 'Atrasada' ? 'primary-button' : 'secondary-button'} onClick={() => settle(row)}>
+              {row.status !== text.done ? (
+                <button type="button" className={row.status === 'Atrasada' ? 'primary-button' : 'secondary-button'} onClick={() => setSettleTarget(row)}>
                   {text.action}
+                </button>
+              ) : (
+                <button type="button" className="secondary-button" title={text.undo} onClick={() => setUndoTarget(row)}>
+                  <Undo2 size={14} /> Desfazer
                 </button>
               )}
             </span>
@@ -325,6 +376,33 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
           categories={categories.data ?? []}
           onClose={() => setGenerating(false)}
           onSubmit={generate}
+        />
+      )}
+
+      {settleTarget && (
+        <SettleModal
+          kind={kind}
+          title={settleTarget.title}
+          expected={settleTarget.value}
+          offCash={!settleTarget.counted}
+          onClose={() => setSettleTarget(null)}
+          onSubmit={(data) => settle(settleTarget, data)}
+        />
+      )}
+
+      {undoTarget && (
+        <ConfirmDialog
+          title="Voltar para pendente"
+          message={`"${undoTarget.title}" volta a ficar pendente. O ${kind === 'pagar' ? 'pagamento' : 'recebimento'} de ${formatMoney(
+            undoTarget.settled ?? undoTarget.value,
+          )}${undoTarget.settledOn ? ` em ${formatDateBR(undoTarget.settledOn)}` : ''} será removido.`}
+          confirmLabel={text.undo}
+          onCancel={() => setUndoTarget(null)}
+          onConfirm={async () => {
+            const row = undoTarget;
+            setUndoTarget(null);
+            await undo(row);
+          }}
         />
       )}
 

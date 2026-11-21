@@ -15,7 +15,7 @@ import {
   saveProfile,
   updateCategory,
 } from '../../api/finance';
-import { formatMoney, hasTooManyDecimals, parseMoneyInput } from '../../lib/format';
+import { formatMoney, hasTooManyDecimals, moneyToInput, parseMoneyInput } from '../../lib/format';
 import { useLoad } from '../../lib/useLoad';
 import './finance.css';
 
@@ -55,8 +55,8 @@ function ProfileSection() {
   useEffect(() => {
     const p = profile.data;
     if (!p) return;
-    setInitial(String(p.saldo_inicial ?? 0).replace('.', ','));
-    setSalary(p.salario_liquido != null ? String(p.salario_liquido).replace('.', ',') : '');
+    setInitial(moneyToInput(p.saldo_inicial ?? 0));
+    setSalary(p.salario_liquido != null ? moneyToInput(p.salario_liquido) : '');
     setDays(String(p.dias_trabalhados_mes ?? 22));
     setHours(String(p.horas_por_dia ?? 8).replace('.', ','));
   }, [profile.data]);
@@ -76,7 +76,8 @@ function ProfileSection() {
     setSaving(true);
     setMessage(null);
     try {
-      await saveProfile({ saldo_inicial: saldo ?? 0, salario_liquido: sal, dias_trabalhados_mes: d, horas_por_dia: h });
+      // Salário em branco vai como null para apagar o valor salvo (undefined não mudava nada).
+      await saveProfile({ saldo_inicial: saldo ?? 0, salario_liquido: sal ?? null, dias_trabalhados_mes: d, horas_por_dia: h });
       setMessage({ ok: true, text: 'Alterações salvas.' });
     } catch (err) {
       setMessage({ ok: false, text: err instanceof Error ? err.message : 'Não foi possível salvar.' });
@@ -206,7 +207,7 @@ function CategoryModal({
 }: {
   category?: Category;
   onClose: () => void;
-  onSubmit: (payload: { nome: string; tipo: CategoryKind; cor?: string }) => Promise<unknown>;
+  onSubmit: (payload: { nome: string; tipo: CategoryKind; cor?: string | null }) => Promise<unknown>;
 }) {
   const [nome, setNome] = useState(category?.nome ?? '');
   const [tipo, setTipo] = useState<CategoryKind>(category?.tipo ?? 'despesa');
@@ -220,7 +221,8 @@ function CategoryModal({
     setSubmitting(true);
     setError(null);
     try {
-      await onSubmit({ nome: nome.trim(), tipo, cor: cor || undefined });
+      // Na edição, cor desmarcada vai como null para a API apagar a cor antiga.
+      await onSubmit({ nome: nome.trim(), tipo, cor: cor || (category ? null : undefined) });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível salvar.');

@@ -35,7 +35,10 @@ export function formatCurrency(value: number | string | null): string {
 
 export function formatDate(value: string | null): string {
   if (!value) return 'Sem prazo';
-  const date = new Date(value);
+  // "2026-12-10" lido com new Date() vira meia-noite UTC = dia 09 no horário
+  // do Brasil. Por isso montamos a data no fuso local a partir de ano/mês/dia.
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  const date = new Date(year, month - 1, day);
   if (Number.isNaN(date.getTime())) return 'Sem prazo';
   return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 }

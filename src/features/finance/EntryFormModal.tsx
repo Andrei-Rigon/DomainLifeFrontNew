@@ -3,7 +3,8 @@ import { Modal } from '../../components/Modal';
 import '../../components/forms.css';
 import './finance.css';
 import type { Category, Entry, EntryKind, EntryPayload, PaymentMethod } from '../../api/finance';
-import { hasTooManyDecimals, parseMoneyInput, todayISO } from '../../lib/format';
+import { CaixaCheck } from './components';
+import { hasTooManyDecimals, moneyToInput, parseMoneyInput, todayISO } from '../../lib/format';
 
 interface EntryFormModalProps {
   entry?: Entry;
@@ -23,12 +24,13 @@ const METHODS: { value: PaymentMethod; label: string }[] = [
 
 export function EntryFormModal({ entry, defaultKind = 'despesa', categories, onClose, onSubmit }: EntryFormModalProps) {
   const [tipo, setTipo] = useState<EntryKind>(entry?.tipo ?? defaultKind);
-  const [valor, setValor] = useState(entry ? String(entry.valor).replace('.', ',') : '');
+  const [valor, setValor] = useState(entry ? moneyToInput(entry.valor) : '');
   const [data, setData] = useState(entry?.data ?? todayISO());
   const [categoria, setCategoria] = useState(entry?.id_categoria ? String(entry.id_categoria) : '');
   const [descricao, setDescricao] = useState(entry?.descricao ?? '');
   const [forma, setForma] = useState<PaymentMethod | ''>(entry?.forma_pagamento ?? '');
   const [observacao, setObservacao] = useState(entry?.observacao ?? '');
+  const [contabilizar, setContabilizar] = useState(entry?.contabilizar ?? true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -49,15 +51,19 @@ export function EntryFormModal({ entry, defaultKind = 'despesa', categories, onC
 
     setSubmitting(true);
     setError(null);
+    // Na edição, campo vazio vai como null para a API apagar o valor antigo
+    // (antes, tirar a categoria ou a forma de pagamento não tinha efeito).
+    const empty = entry ? null : undefined;
     try {
       await onSubmit({
         tipo,
         valor: amount,
         data,
-        id_categoria: categoria ? Number(categoria) : undefined,
-        descricao: descricao.trim() || undefined,
-        forma_pagamento: forma || undefined,
-        observacao: observacao.trim() || undefined,
+        id_categoria: categoria ? Number(categoria) : empty,
+        descricao: descricao.trim() || empty,
+        forma_pagamento: forma || empty,
+        observacao: observacao.trim() || empty,
+        contabilizar,
       });
       onClose();
     } catch (err) {
@@ -165,6 +171,11 @@ export function EntryFormModal({ entry, defaultKind = 'despesa', categories, onC
             onChange={(e) => setObservacao(e.target.value)}
           />
         </div>
+        <CaixaCheck
+          checked={contabilizar}
+          onChange={setContabilizar}
+          hint="Desmarque se este valor já entra por outro lançamento (ex.: compra no cartão, que vai na fatura)."
+        />
       </form>
     </Modal>
   );

@@ -40,6 +40,13 @@ export function DashboardPage() {
   const dueSoon = d?.parcelas_vencendo_7_dias ?? [];
   const dueTotal = somar(dueSoon.map((p) => p.valor_parcela));
 
+  // /dashboard demora ~1,7 s. Enquanto não chega, mostramos "…" em vez de zeros
+  // e "Nada pendente", que pareciam dados reais e davam a impressão de tela quebrada.
+  const loadingDash = !d && !dashboard.error;
+  const loadingBalance = !balance.data && !balance.error;
+  const loadingObjectives = !objectives.data && !objectives.error;
+  const wait = (text: string, loading: boolean) => (loading ? '…' : text);
+
   const [units, cents] = splitCents(balance.data?.saldo ?? 0);
   const monthResult = finance?.saldo ?? 0;
   const error = dashboard.error ?? balance.error;
@@ -57,12 +64,20 @@ export function DashboardPage() {
           </div>
           <p className="hero-title">Saldo acumulado</p>
           <div className="hero-value">
-            {units}
-            <span className="cents">,{cents}</span>
-            <span className={`hero-trend${monthResult < 0 ? ' is-negative' : ''}`}>
-              {monthResult < 0 ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}
-              {formatMoney(Math.abs(monthResult))} no mês
-            </span>
+            {loadingBalance ? (
+              'R$ …'
+            ) : (
+              <>
+                {units}
+                <span className="cents">,{cents}</span>
+              </>
+            )}
+            {!loadingDash && (
+              <span className={`hero-trend${monthResult < 0 ? ' is-negative' : ''}`}>
+                {monthResult < 0 ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}
+                {formatMoney(Math.abs(monthResult))} no mês
+              </span>
+            )}
           </div>
           <p className="hero-footnote">saldo inicial + tudo que entrou − tudo que saiu, até hoje</p>
           <div className="hero-stats">
@@ -72,7 +87,7 @@ export function DashboardPage() {
               </span>
               <div>
                 <small>Entradas do mês</small>
-                <strong>{formatMoney(finance?.entradas)}</strong>
+                <strong>{wait(formatMoney(finance?.entradas), loadingDash)}</strong>
               </div>
             </div>
             <div>
@@ -81,7 +96,7 @@ export function DashboardPage() {
               </span>
               <div>
                 <small>Saídas do mês</small>
-                <strong>{formatMoney(finance?.saidas)}</strong>
+                <strong>{wait(formatMoney(finance?.saidas), loadingDash)}</strong>
               </div>
             </div>
           </div>
@@ -111,7 +126,7 @@ export function DashboardPage() {
             </span>
             <span className="quick-note">HOJE</span>
           </div>
-          <strong className="quick-number">{agendaToday}</strong>
+          <strong className="quick-number">{wait(String(agendaToday), loadingDash)}</strong>
           <span className="quick-label">{agendaToday === 1 ? 'compromisso na agenda' : 'compromissos na agenda'}</span>
           <Link className="text-link" to="/agendamentos">
             Ver agenda →
@@ -125,9 +140,7 @@ export function DashboardPage() {
             </span>
             <span className="quick-note">ESTA SEMANA</span>
           </div>
-          <strong className="quick-number">
-            {goalsDone}/{goals.length}
-          </strong>
+          <strong className="quick-number">{wait(`${goalsDone}/${goals.length}`, loadingDash)}</strong>
           <span className="quick-label">metas concluídas</span>
           <div className="mini-progress">
             <span style={{ width: `${goals.length ? (goalsDone / goals.length) * 100 : 0}%` }} />
@@ -141,7 +154,7 @@ export function DashboardPage() {
             </span>
             <span className="quick-note">EM ANDAMENTO</span>
           </div>
-          <strong className="quick-number">{activeObjectives}</strong>
+          <strong className="quick-number">{wait(String(activeObjectives), loadingObjectives)}</strong>
           <span className="quick-label">{activeObjectives === 1 ? 'objetivo ativo' : 'objetivos ativos'}</span>
           <Link className="text-link" to="/objetivos">
             Acompanhar →
@@ -155,7 +168,7 @@ export function DashboardPage() {
             </span>
             <span className="quick-note">PRÓXIMOS 7 DIAS</span>
           </div>
-          <strong className="quick-number">{formatMoney(dueTotal)}</strong>
+          <strong className="quick-number">{wait(formatMoney(dueTotal), loadingDash)}</strong>
           <span className="quick-label">em contas a vencer</span>
           <Link className="text-link" to="/pagar">
             Conferir contas →
@@ -166,7 +179,9 @@ export function DashboardPage() {
       <section className="dashboard-grid">
         <article className="panel">
           <PanelHeading kicker="PRÓXIMOS 7 DIAS" title="Agenda" />
-          {(d?.agenda_proximos_7_dias ?? []).length === 0 ? (
+          {loadingDash ? (
+            <p className="muted-caption">Carregando…</p>
+          ) : (d?.agenda_proximos_7_dias ?? []).length === 0 ? (
             <EmptyState icon={<CalendarDays size={22} />} title="Nenhum compromisso por perto" text="Que tal aproveitar para descansar?" />
           ) : (
             <div className="agenda-list">
@@ -207,7 +222,8 @@ export function DashboardPage() {
                 <span className="task-date">meta da semana</span>
               </div>
             ))}
-            {(d?.tarefas_em_andamento ?? []).length + goals.length === 0 && (
+            {loadingDash && <p className="muted-caption">Carregando…</p>}
+            {!loadingDash && (d?.tarefas_em_andamento ?? []).length + goals.length === 0 && (
               <EmptyState icon={<Sparkles size={22} />} title="Nada pendente por aqui" text="Seu foco está livre." />
             )}
           </div>

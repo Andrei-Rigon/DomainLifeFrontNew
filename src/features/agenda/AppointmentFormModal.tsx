@@ -35,13 +35,16 @@ export function AppointmentFormModal({
 
     setSubmitting(true);
     setError(null);
+    // Na edição, campo vazio vai como null para a API apagar o valor antigo
+    // (ex.: tirar o horário e deixar o compromisso como "dia todo").
+    const empty = isEditing ? null : undefined;
     try {
       await onSubmit({
         titulo: titulo.trim(),
         data_evento: dataEvento,
-        hora_evento: horaEvento || undefined,
-        localizacao: localizacao.trim() || undefined,
-        descricao: descricao.trim() || undefined,
+        hora_evento: horaEvento || empty,
+        localizacao: localizacao.trim() || empty,
+        descricao: descricao.trim() || empty,
       });
       onClose();
     } catch (err) {

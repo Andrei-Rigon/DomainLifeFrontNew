@@ -1,4 +1,4 @@
-import { Calendar, CalendarDays, Columns3, Filter, List, Search } from 'lucide-react';
+import { Calendar, CalendarDays, Columns3, List, Search } from 'lucide-react';
 import type { AgendaViewMode } from './types';
 import './AgendaToolbar.css';
 
@@ -61,9 +61,7 @@ export function AgendaToolbar({
           />
         </label>
 
-        <button type="button" className="agenda-filter-btn" title="Filtros" aria-label="Filtros">
-          <Filter size={16} />
-        </button>
+        {/* O botão "Filtros" foi removido: não tinha ação nenhuma (a busca ao lado já filtra). */}
       </div>
     </div>
   );

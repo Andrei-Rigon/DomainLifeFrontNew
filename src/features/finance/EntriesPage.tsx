@@ -3,7 +3,7 @@ import { ArrowDownLeft, ArrowUpRight, Download, Search } from 'lucide-react';
 import { ActionMenu } from '../../components/ActionMenu';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { EmptyState, PageHeading } from '../../components/PageHeading';
-import { MonthPicker } from './components';
+import { MonthPicker, OffCashTag } from './components';
 import { EntryFormModal } from './EntryFormModal';
 import {
   type Entry,
@@ -56,8 +56,11 @@ export function EntriesPage() {
     });
   }, [entries.data, kind, categoryId, search]);
 
-  const totalIn = somar(visible.filter((e) => e.tipo === 'receita').map((e) => e.valor));
-  const totalOut = somar(visible.filter((e) => e.tipo === 'despesa').map((e) => e.valor));
+  // Totais só com o que conta no caixa; o resto aparece na lista, cinza e riscado.
+  const counted = visible.filter((e) => e.contabilizar !== false);
+  const totalIn = somar(counted.filter((e) => e.tipo === 'receita').map((e) => e.valor));
+  const totalOut = somar(counted.filter((e) => e.tipo === 'despesa').map((e) => e.valor));
+  const offCash = somar(visible.filter((e) => e.contabilizar === false).map((e) => e.valor));
 
   async function handleSubmit(payload: EntryPayload) {
     if (form?.entry) await updateEntry(form.entry.id, payload);
@@ -128,6 +131,11 @@ export function EntriesPage() {
         <span>
           Saídas <strong className="negative-text">{formatMoney(totalOut)}</strong>
         </span>
+        {offCash > 0 && (
+          <span title="Lançamentos marcados para não contabilizar no caixa">
+            Fora do caixa <strong className="muted-caption">{formatMoney(offCash)}</strong>
+          </span>
+        )}
       </div>
 
       <section className="panel list-panel">
@@ -141,12 +149,13 @@ export function EntriesPage() {
         </div>
 
         {visible.map((entry) => (
-          <div className="transaction-row" key={entry.id}>
+          <div className={`transaction-row${entry.contabilizar === false ? ' is-uncounted' : ''}`} key={entry.id}>
             <span className={`transaction-symbol ${entry.tipo === 'receita' ? 'income-symbol' : 'expense-symbol'}`}>
               {entry.tipo === 'receita' ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
             </span>
             <strong>
               {entry.descricao || entry.categoria?.nome || 'Sem descrição'}
+              {entry.contabilizar === false && <OffCashTag />}
               {(entry.forma_pagamento || entry.origem !== 'manual') && (
                 <small>{[entry.forma_pagamento && METHOD_LABEL[entry.forma_pagamento], entry.origem !== 'manual' && entry.origem].filter(Boolean).join(' · ')}</small>
               )}

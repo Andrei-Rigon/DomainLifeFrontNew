@@ -4,6 +4,7 @@ import '../../components/forms.css';
 import { COUNT_TYPES } from './countsUi';
 import type { Count, CountPayload, CountType } from '../../api/counts';
 import './CountFormModal.css';
+import { CaixaCheck } from '../finance/components';
 
 interface CountFormModalProps {
   count?: Count;
@@ -34,8 +35,8 @@ export function CountFormModal({ count, onClose, onSubmit }: CountFormModalProps
   // A API devolve dinheiro como número (ex.: 100). O campo trabalha com texto,
   // então convertemos aqui; sem isso o .trim() do parseMoney quebrava ao editar.
   const [valorEsperado, setValorEsperado] = useState(moneyToField(count?.valor_esperado));
-  const [valorPago, setValorPago] = useState(moneyToField(count?.valor_pago));
   const [parcelas, setParcelas] = useState(count?.qtde_parceladas ? String(count.qtde_parceladas) : '');
+  const [contabilizar, setContabilizar] = useState(count?.contabilizar ?? true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -51,15 +52,9 @@ export function CountFormModal({ count, onClose, onSubmit }: CountFormModalProps
     }
 
     const esperado = parseMoney(valorEsperado);
-    const pago = parseMoney(valorPago);
-    for (const [label, value] of [
-      ['Valor esperado', esperado],
-      ['Valor pago', pago],
-    ] as const) {
-      if (value !== undefined && (Number.isNaN(value) || value < 0 || hasTooManyDecimals(value))) {
-        setError(`${label} inválido: use um número positivo com no máximo 2 casas decimais.`);
-        return;
-      }
+    if (esperado !== undefined && (Number.isNaN(esperado) || esperado < 0 || hasTooManyDecimals(esperado))) {
+      setError('Valor esperado inválido: use um número positivo com no máximo 2 casas decimais.');
+      return;
     }
 
     let qtde: number | undefined;
@@ -82,9 +77,10 @@ export function CountFormModal({ count, onClose, onSubmit }: CountFormModalProps
         descricao: descricao.trim() || empty,
         tipo,
         valor_esperado: esperado ?? empty,
-        valor_pago: pago ?? empty,
+        // valor_pago não é enviado: o campo foi ocultado e o valor já salvo fica como está.
         // Parcelas só valem para o tipo "Conta"; ao trocar de tipo, limpa.
         qtde_parceladas: qtde ?? empty,
+        contabilizar,
       });
       onClose();
     } catch (err) {
@@ -143,31 +139,18 @@ export function CountFormModal({ count, onClose, onSubmit }: CountFormModalProps
           </div>
         </div>
 
-        <div className="field-row">
-          <div className="field">
-            <label htmlFor="valor_esperado">Valor esperado</label>
-            <input
-              id="valor_esperado"
-              type="number"
-              step="0.01"
-              min="0"
-              value={valorEsperado}
-              onChange={(event) => setValorEsperado(event.target.value)}
-              placeholder="0,00"
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="valor_pago">Valor pago</label>
-            <input
-              id="valor_pago"
-              type="number"
-              step="0.01"
-              min="0"
-              value={valorPago}
-              onChange={(event) => setValorPago(event.target.value)}
-              placeholder="0,00"
-            />
-          </div>
+        {/* O valor pago fica oculto aqui: a conta é só o molde. O pagamento é registrado em "A pagar". */}
+        <div className="field">
+          <label htmlFor="valor_esperado">Valor esperado</label>
+          <input
+            id="valor_esperado"
+            type="number"
+            step="0.01"
+            min="0"
+            value={valorEsperado}
+            onChange={(event) => setValorEsperado(event.target.value)}
+            placeholder="0,00"
+          />
         </div>
 
         {isInstallment && (
@@ -184,6 +167,12 @@ export function CountFormModal({ count, onClose, onSubmit }: CountFormModalProps
             />
           </div>
         )}
+
+        <CaixaCheck
+          checked={contabilizar}
+          onChange={setContabilizar}
+          hint="Desmarque se esta conta é paga no cartão (a fatura já entra no caixa). As parcelas novas já vêm fora do caixa."
+        />
 
         <div className="field">
           <label htmlFor="descricao">Descrição</label>
