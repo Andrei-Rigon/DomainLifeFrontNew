@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, Download, Search } from 'lucide-react';
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Download, Search } from 'lucide-react';
 import { ActionMenu } from '../../components/ActionMenu';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { EmptyState, PageHeading } from '../../components/PageHeading';
@@ -12,6 +12,7 @@ import {
   createEntry,
   deleteEntry,
   exportCsv,
+  listBankAccounts,
   listCategories,
   listEntries,
   updateEntry,
@@ -27,6 +28,7 @@ const TABS: { value: KindFilter; label: string }[] = [
   { value: 'todos', label: 'Todos' },
   { value: 'despesa', label: 'Despesas' },
   { value: 'receita', label: 'Receitas' },
+  { value: 'transferencia', label: 'Transferências' },
 ];
 
 const PAGE_LIMIT = 200; // a API devolve no máximo 200 por consulta
@@ -37,6 +39,7 @@ export function EntriesPage() {
   const [month, setMonth] = useState(currentMonth());
   const [kind, setKind] = useState<KindFilter>('todos');
   const [categoryId, setCategoryId] = useState('');
+  const [bankId, setBankId] = useState('');
   const [search, setSearch] = useState('');
   const [form, setForm] = useState<{ entry?: Entry } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Entry | null>(null);
@@ -45,22 +48,25 @@ export function EntriesPage() {
   const { start, end } = monthRange(month);
   const entries = useLoad(() => listEntries({ start, end }), [start, end]);
   const categories = useLoad(listCategories, []);
+  const bankAccounts = useLoad(listBankAccounts, []);
 
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
     return (entries.data ?? []).filter((entry) => {
       if (kind !== 'todos' && entry.tipo !== kind) return false;
       if (categoryId && String(entry.id_categoria) !== categoryId) return false;
+      if (bankId && String(entry.id_conta_bancaria) !== bankId && String(entry.id_conta_destino) !== bankId) return false;
       if (!term) return true;
-      return [entry.descricao, entry.categoria?.nome, entry.observacao].some((f) => f?.toLowerCase().includes(term));
+      return [entry.descricao, entry.categoria?.nome, entry.observacao, entry.conta_bancaria?.nome, entry.conta_destino?.nome].some((f) => f?.toLowerCase().includes(term));
     });
-  }, [entries.data, kind, categoryId, search]);
+  }, [entries.data, kind, categoryId, bankId, search]);
 
   // Totais só com o que conta no caixa; o resto aparece na lista, cinza e riscado.
   const counted = visible.filter((e) => e.contabilizar !== false);
   const totalIn = somar(counted.filter((e) => e.tipo === 'receita').map((e) => e.valor));
   const totalOut = somar(counted.filter((e) => e.tipo === 'despesa').map((e) => e.valor));
-  const offCash = somar(visible.filter((e) => e.contabilizar === false).map((e) => e.valor));
+  const offCash = somar(visible.filter((e) => e.contabilizar === false && e.tipo !== 'transferencia').map((e) => e.valor));
+  const transfers = somar(visible.filter((e) => e.tipo === 'transferencia').map((e) => e.valor));
 
   async function handleSubmit(payload: EntryPayload) {
     if (form?.entry) await updateEntry(form.entry.id, payload);
@@ -113,6 +119,16 @@ export function EntriesPage() {
               </option>
             ))}
           </select>
+          {(bankAccounts.data?.length ?? 0) > 0 && (
+            <select className="select-field" value={bankId} onChange={(e) => setBankId(e.target.value)} aria-label="Conta bancária">
+              <option value="">Todas as contas</option>
+              {(bankAccounts.data ?? []).map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.nome}
+                </option>
+              ))}
+            </select>
+          )}
           <button type="button" className="secondary-button" onClick={handleExport}>
             <Download size={15} /> CSV
           </button>
@@ -136,6 +152,11 @@ export function EntriesPage() {
             Fora do caixa <strong className="muted-caption">{formatMoney(offCash)}</strong>
           </span>
         )}
+        {transfers > 0 && (
+          <span title="Dinheiro que só mudou de conta: não entra no resultado">
+            Transferências <strong className="muted-caption">{formatMoney(transfers)}</strong>
+          </span>
+        )}
       </div>
 
       <section className="panel list-panel">
@@ -148,17 +169,20 @@ export function EntriesPage() {
           <span />
         </div>
 
-        {visible.map((entry) => (
-          <div className={`transaction-row${entry.contabilizar === false ? ' is-uncounted' : ''}`} key={entry.id}>
-            <span className={`transaction-symbol ${entry.tipo === 'receita' ? 'income-symbol' : 'expense-symbol'}`}>
-              {entry.tipo === 'receita' ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+        {visible.map((entry) => {
+          const isTransfer = entry.tipo === 'transferencia';
+          const details = isTransfer
+            ? [`${entry.conta_bancaria?.nome ?? '?'} → ${entry.conta_destino?.nome ?? '?'}`]
+            : [entry.conta_bancaria?.nome, entry.forma_pagamento && METHOD_LABEL[entry.forma_pagamento], entry.origem !== 'manual' && entry.origem];
+          return (
+          <div className={`transaction-row${entry.contabilizar === false && !isTransfer ? ' is-uncounted' : ''}`} key={entry.id}>
+            <span className={`transaction-symbol ${isTransfer ? 'transfer-symbol' : entry.tipo === 'receita' ? 'income-symbol' : 'expense-symbol'}`}>
+              {isTransfer ? <ArrowLeftRight size={16} /> : entry.tipo === 'receita' ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
             </span>
             <strong>
-              {entry.descricao || entry.categoria?.nome || 'Sem descrição'}
-              {entry.contabilizar === false && <OffCashTag />}
-              {(entry.forma_pagamento || entry.origem !== 'manual') && (
-                <small>{[entry.forma_pagamento && METHOD_LABEL[entry.forma_pagamento], entry.origem !== 'manual' && entry.origem].filter(Boolean).join(' · ')}</small>
-              )}
+              {entry.descricao || entry.categoria?.nome || (isTransfer ? 'Transferência' : 'Sem descrição')}
+              {entry.contabilizar === false && !isTransfer && <OffCashTag />}
+              {details.some(Boolean) && <small>{details.filter(Boolean).join(' · ')}</small>}
             </strong>
             <span className="transaction-category">
               {entry.categoria ? (
@@ -166,17 +190,20 @@ export function EntriesPage() {
                   <i className="chip-dot" style={{ background: entry.categoria.cor ?? 'var(--line-strong)' }} />
                   {entry.categoria.nome}
                 </>
+              ) : isTransfer ? (
+                'Transferência'
               ) : (
                 '—'
               )}
             </span>
             <span className="transaction-date">{formatDateShort(entry.data)}</span>
-            <b className={`transaction-amount ${entry.tipo === 'receita' ? 'positive-text' : 'negative-text'}`}>
-              {entry.tipo === 'receita' ? '+' : '−'} {formatMoney(entry.valor)}
+            <b className={`transaction-amount ${isTransfer ? 'transfer-amount' : entry.tipo === 'receita' ? 'positive-text' : 'negative-text'}`}>
+              {isTransfer ? '⇄' : entry.tipo === 'receita' ? '+' : '−'} {formatMoney(entry.valor)}
             </b>
             <ActionMenu onEdit={() => setForm({ entry })} onDelete={() => setDeleteTarget(entry)} />
           </div>
-        ))}
+          );
+        })}
 
         {visible.length === 0 && (
           <EmptyState
@@ -197,6 +224,7 @@ export function EntriesPage() {
         <EntryFormModal
           entry={form.entry}
           categories={categories.data ?? []}
+          bankAccounts={bankAccounts.data ?? []}
           onClose={() => setForm(null)}
           onSubmit={handleSubmit}
         />

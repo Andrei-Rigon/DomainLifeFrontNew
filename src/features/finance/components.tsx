@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, EyeOff } from 'lucide-react';
+import type { BankAccount } from '../../api/finance';
 import { currentMonth, formatMoney, monthTitle, shiftMonth } from '../../lib/format';
 import '../../styles/ui.css';
 import './finance.css';
@@ -67,5 +68,41 @@ export function OffCashTag() {
     <span className="off-cash-tag" title="Fora do caixa: não entra nas entradas, saídas nem no saldo">
       <EyeOff size={11} /> fora do caixa
     </span>
+  );
+}
+
+/** Select de conta bancária. Contas inativas só aparecem se já estiverem selecionadas. */
+export function BankAccountSelect({
+  id,
+  label,
+  accounts,
+  value,
+  onChange,
+  emptyLabel = 'Sem conta',
+  exclude,
+}: {
+  id: string;
+  label: string;
+  accounts: BankAccount[];
+  value: string;
+  onChange: (value: string) => void;
+  emptyLabel?: string | null;
+  exclude?: string;
+}) {
+  const options = accounts.filter((a) => (a.ativa || String(a.id) === value) && String(a.id) !== exclude);
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
+        {emptyLabel !== null && <option value="">{emptyLabel}</option>}
+        {emptyLabel === null && <option value="">Escolha…</option>}
+        {options.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.nome}
+            {a.ativa ? '' : ' (inativa)'}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }

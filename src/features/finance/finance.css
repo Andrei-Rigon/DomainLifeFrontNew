@@ -13,7 +13,8 @@
 
 .fin-kind-toggle {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: 8px;
 }
 
@@ -38,6 +39,58 @@
   background: var(--mint-bg);
   border-color: var(--pos);
   color: var(--pos);
+}
+
+.fin-kind-btn--transferencia.fin-kind-btn--active {
+  background: var(--purple-pale);
+  border-color: var(--purple);
+  color: var(--purple-dark);
+}
+
+/* Transferência na lista: neutra (não é entrada nem saída) */
+.transfer-symbol {
+  color: var(--purple-dark);
+  background: var(--purple-pale);
+}
+
+.transfer-amount {
+  color: var(--muted);
+}
+
+/* Saldo por conta (visão geral) */
+.account-balances {
+  display: grid;
+  gap: 2px;
+  margin-top: 14px;
+}
+
+.account-balance-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.account-balance-row:last-child {
+  border-bottom: 0;
+}
+
+.account-balance-row .grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-balance-row small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.account-balance-row.is-total {
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 0;
+  margin-top: 4px;
 }
 
 .fin-color-picker {

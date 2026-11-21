@@ -6,10 +6,17 @@ import { Modal } from '../../components/Modal';
 import { PageHeading, PanelHeading } from '../../components/PageHeading';
 import '../../components/forms.css';
 import {
+  type BankAccount,
+  type BankAccountKind,
+  type BankAccountPayload,
   type Category,
   type CategoryKind,
+  createBankAccount,
   createCategory,
+  deleteBankAccount,
   deleteCategory,
+  listBankAccounts,
+  updateBankAccount,
   getProfile,
   listCategories,
   saveProfile,
@@ -17,6 +24,7 @@ import {
 } from '../../api/finance';
 import { formatMoney, hasTooManyDecimals, moneyToInput, parseMoneyInput } from '../../lib/format';
 import { useLoad } from '../../lib/useLoad';
+import { BANK_KIND_LABEL } from './bankAccounts';
 import './finance.css';
 
 const KINDS: { value: CategoryKind; label: string }[] = [
@@ -37,6 +45,7 @@ export function SettingsPage() {
       />
       <div className="settings-layout">
         <ProfileSection />
+        <BankAccountsSection />
         <CategoriesSection />
       </div>
     </>
@@ -100,7 +109,10 @@ function ProfileSection() {
         <div className="field">
           <label htmlFor="perfil-saldo">Saldo inicial</label>
           <input id="perfil-saldo" inputMode="decimal" value={initial} onChange={(e) => setInitial(e.target.value)} placeholder="0,00" />
-          <span className="fin-hint">Quanto você já tinha ao começar a usar o sistema. Entra no saldo acumulado.</span>
+          <span className="fin-hint">
+            Quanto você já tinha ao começar a usar o sistema. Entra no saldo acumulado. Se cadastrar contas bancárias, prefira o saldo
+            inicial de cada conta e deixe este em zero.
+          </span>
         </div>
         <div className="field">
           <label htmlFor="perfil-salario">Salário líquido</label>
@@ -277,6 +289,172 @@ function CategoryModal({
             ))}
           </div>
         </div>
+      </form>
+    </Modal>
+  );
+}
+
+const BANK_KINDS: BankAccountKind[] = ['corrente', 'investimento', 'cartao'];
+
+function BankAccountsSection() {
+  const accounts = useLoad(listBankAccounts, []);
+  const [form, setForm] = useState<{ account?: BankAccount } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<BankAccount | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  return (
+    <section className="panel settings-panel">
+      <PanelHeading
+        kicker="ONDE ESTÁ O SEU DINHEIRO"
+        title="Contas bancárias"
+        action={
+          <button type="button" className="secondary-button" onClick={() => setForm({})}>
+            <Plus size={14} /> Nova conta
+          </button>
+        }
+      />
+      <p className="settings-intro">
+        Sicoob, Nubank, investimentos, cartão… Cada lançamento pode dizer de qual conta saiu, e transferências entre elas não contam como
+        gasto.
+      </p>
+      {accounts.error && <div className="error-banner">{accounts.error}</div>}
+
+      <div className="settings-category">
+        {(accounts.data ?? []).map((a) => (
+          <div key={a.id} style={a.ativa ? undefined : { opacity: 0.55 }}>
+            <span className="grow">
+              {a.nome}
+              {!a.ativa && ' (inativa)'}
+            </span>
+            <span className="note-tag">{BANK_KIND_LABEL[a.tipo] ?? a.tipo}</span>
+            <span className="muted-caption">inicial {formatMoney(a.saldo_inicial)}</span>
+            <ActionMenu
+              onEdit={() => setForm({ account: a })}
+              onDelete={() => {
+                setDeleteError(null);
+                setDeleteTarget(a);
+              }}
+            />
+          </div>
+        ))}
+        {accounts.data?.length === 0 && <p className="muted-caption">Nenhuma conta cadastrada ainda.</p>}
+      </div>
+
+      {form && (
+        <BankAccountModal
+          account={form.account}
+          onClose={() => setForm(null)}
+          onSubmit={async (payload) => {
+            if (form.account) await updateBankAccount(form.account.id, payload);
+            else await createBankAccount(payload);
+            await accounts.reload();
+          }}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Excluir conta bancária"
+          message={deleteError ?? `Excluir a conta "${deleteTarget.nome}"? Só é possível se ela não tiver movimentação; senão, desative.`}
+          confirmLabel="Excluir"
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={async () => {
+            try {
+              await deleteBankAccount(deleteTarget.id);
+              setDeleteTarget(null);
+              await accounts.reload();
+            } catch (err) {
+              setDeleteError(err instanceof Error ? err.message : 'Não foi possível excluir.');
+            }
+          }}
+        />
+      )}
+    </section>
+  );
+}
+
+function BankAccountModal({
+  account,
+  onClose,
+  onSubmit,
+}: {
+  account?: BankAccount;
+  onClose: () => void;
+  onSubmit: (payload: BankAccountPayload) => Promise<unknown>;
+}) {
+  const [nome, setNome] = useState(account?.nome ?? '');
+  const [tipo, setTipo] = useState<BankAccountKind>(account?.tipo ?? 'corrente');
+  const [inicial, setInicial] = useState(account ? moneyToInput(account.saldo_inicial) : '');
+  const [ativa, setAtiva] = useState(account?.ativa ?? true);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (!nome.trim()) return setError('Informe o nome.');
+    // Aceita negativo (ex.: cartão com fatura em aberto)
+    const negative = inicial.trim().startsWith('-');
+    const parsed = parseMoneyInput(inicial.replace('-', ''));
+    if (parsed !== undefined && (Number.isNaN(parsed) || hasTooManyDecimals(parsed))) return setError('Saldo inicial inválido.');
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onSubmit({ nome: nome.trim(), tipo, saldo_inicial: (parsed ?? 0) * (negative ? -1 : 1), ativa });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível salvar.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Modal
+      title={account ? 'Editar conta bancária' : 'Nova conta bancária'}
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>
+            Cancelar
+          </button>
+          <button type="submit" form="bank-account-form" className="btn btn-primary" disabled={submitting}>
+            {submitting ? 'Salvando…' : 'Salvar'}
+          </button>
+        </>
+      }
+    >
+      <form id="bank-account-form" className="fin-form" onSubmit={handleSubmit}>
+        {error && <div className="form-error">{error}</div>}
+        <div className="field">
+          <label htmlFor="bank-nome">Nome</label>
+          <input id="bank-nome" value={nome} maxLength={100} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Nubank" autoFocus />
+        </div>
+        <div className="field-row">
+          <div className="field">
+            <label htmlFor="bank-tipo">Tipo</label>
+            <select id="bank-tipo" value={tipo} onChange={(e) => setTipo(e.target.value as BankAccountKind)}>
+              {BANK_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {BANK_KIND_LABEL[k]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="bank-inicial">Saldo inicial</label>
+            <input id="bank-inicial" inputMode="decimal" value={inicial} onChange={(e) => setInicial(e.target.value)} placeholder="0,00" />
+          </div>
+        </div>
+        <span className="fin-hint">Saldo da conta no dia em que você começou a lançar nela.</span>
+        {account && (
+          <label className="caixa-check">
+            <input type="checkbox" checked={ativa} onChange={(e) => setAtiva(e.target.checked)} />
+            <span>
+              <strong>Conta ativa</strong>
+              <small>Desative para esconder dos formulários sem perder o histórico.</small>
+            </span>
+          </label>
+        )}
       </form>
     </Modal>
   );

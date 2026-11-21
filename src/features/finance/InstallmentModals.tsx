@@ -2,8 +2,9 @@ import { useRef, useState, type FormEvent } from 'react';
 import { Modal } from '../../components/Modal';
 import '../../components/forms.css';
 import './finance.css';
-import type { Category } from '../../api/finance';
-import { CaixaCheck } from './components';
+import type { BankAccount, Category } from '../../api/finance';
+import { BankAccountSelect, CaixaCheck } from './components';
+import { lastBankAccount, rememberBankAccount } from './bankAccounts';
 import type { Count } from '../../api/counts';
 import { formatMoney, hasTooManyDecimals, moneyToInput, parseMoneyInput, todayISO } from '../../lib/format';
 
@@ -19,6 +20,7 @@ export interface InstallmentForm {
   baixa?: number;
   dataBaixa?: string;
   contabilizar: boolean;
+  bankAccountId?: number | null; // conta bancária de onde saiu/entrou
 }
 
 export interface GenerateForm {
@@ -40,6 +42,7 @@ export interface InstallmentInitial {
   baixa: number | null;
   dataBaixa: string | null;
   contabilizar: boolean;
+  bankAccountId?: number | null;
 }
 
 const CAIXA_HINT = {
@@ -62,11 +65,12 @@ interface FormModalProps {
   initial?: InstallmentInitial;
   accounts: Count[];
   categories: Category[];
+  bankAccounts?: BankAccount[];
   onClose: () => void;
   onSubmit: (form: InstallmentForm) => Promise<unknown>;
 }
 
-export function InstallmentFormModal({ kind, initial, accounts, categories, onClose, onSubmit }: FormModalProps) {
+export function InstallmentFormModal({ kind, initial, accounts, categories, bankAccounts = [], onClose, onSubmit }: FormModalProps) {
   const words = WORDS[kind];
   const [accountId, setAccountId] = useState(initial?.accountId ? String(initial.accountId) : '');
   const [categoryId, setCategoryId] = useState(initial?.categoryId ? String(initial.categoryId) : '');
@@ -76,6 +80,7 @@ export function InstallmentFormModal({ kind, initial, accounts, categories, onCl
   const [baixa, setBaixa] = useState(initial?.baixa != null ? moneyToInput(initial.baixa) : '');
   const [dataBaixa, setDataBaixa] = useState(initial?.dataBaixa ?? '');
   const [contabilizar, setContabilizar] = useState(initial?.contabilizar ?? true);
+  const [bank, setBank] = useState(initial ? (initial.bankAccountId ? String(initial.bankAccountId) : '') : lastBankAccount());
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // Último valor preenchido automaticamente: se o usuário digitou outro, não sobrescreve.
@@ -125,7 +130,9 @@ export function InstallmentFormModal({ kind, initial, accounts, categories, onCl
         baixa: paid,
         dataBaixa: dataBaixa || undefined,
         contabilizar,
+        bankAccountId: bank ? Number(bank) : null,
       });
+      rememberBankAccount(bank);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível salvar.');
@@ -217,6 +224,10 @@ export function InstallmentFormModal({ kind, initial, accounts, categories, onCl
             <input id="inst-data-baixa" type="date" value={dataBaixa} onChange={(e) => setDataBaixa(e.target.value)} />
           </div>
         </div>
+
+        {bankAccounts.length > 0 && (
+          <BankAccountSelect id="inst-banco" label="Conta bancária" accounts={bankAccounts} value={bank} onChange={setBank} />
+        )}
 
         <CaixaCheck checked={contabilizar} onChange={setContabilizar} hint={CAIXA_HINT[kind]} />
       </form>
@@ -389,6 +400,7 @@ export function GenerateModal({ kind, accounts, categories, onClose, onSubmit }:
 export interface SettleForm {
   valor: number;
   data: string;
+  bankAccountId?: number | null;
 }
 
 interface SettleModalProps {
@@ -396,6 +408,8 @@ interface SettleModalProps {
   title: string;
   expected: number;
   offCash?: boolean;
+  bankAccounts?: BankAccount[];
+  defaultBankAccountId?: number | null;
   onClose: () => void;
   onSubmit: (form: SettleForm) => Promise<unknown>;
 }
@@ -404,10 +418,20 @@ interface SettleModalProps {
  * Confirmação do botão "Pagar"/"Receber": a conta nem sempre vem com o mesmo valor
  * (luz, água...), então o usuário confirma ou corrige o valor e a data antes de dar baixa.
  */
-export function SettleModal({ kind, title, expected, offCash = false, onClose, onSubmit }: SettleModalProps) {
+export function SettleModal({
+  kind,
+  title,
+  expected,
+  offCash = false,
+  bankAccounts = [],
+  defaultBankAccountId,
+  onClose,
+  onSubmit,
+}: SettleModalProps) {
   const words = WORDS[kind];
   const [valor, setValor] = useState(moneyToInput(expected));
   const [data, setData] = useState(todayISO());
+  const [bank, setBank] = useState(defaultBankAccountId ? String(defaultBankAccountId) : lastBankAccount());
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -423,7 +447,8 @@ export function SettleModal({ kind, title, expected, offCash = false, onClose, o
     setSubmitting(true);
     setError(null);
     try {
-      await onSubmit({ valor: amount as number, data });
+      await onSubmit({ valor: amount as number, data, bankAccountId: bank ? Number(bank) : null });
+      rememberBankAccount(bank);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível dar baixa.');
@@ -463,6 +488,16 @@ export function SettleModal({ kind, title, expected, offCash = false, onClose, o
             <input id="settle-data" type="date" value={data} onChange={(e) => setData(e.target.value)} />
           </div>
         </div>
+
+        {bankAccounts.length > 0 && (
+          <BankAccountSelect
+            id="settle-banco"
+            label={kind === 'pagar' ? 'Pago com a conta' : 'Recebido na conta'}
+            accounts={bankAccounts}
+            value={bank}
+            onChange={setBank}
+          />
+        )}
 
         {offCash && (
           <p className="fin-hint" style={{ margin: 0 }}>

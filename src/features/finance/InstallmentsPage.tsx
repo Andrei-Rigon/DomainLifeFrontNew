@@ -21,6 +21,7 @@ import {
   deleteReceivable,
   generateInstallments,
   generateReceivables,
+  listBankAccounts,
   listCategories,
   listInstallments,
   listReceivables,
@@ -44,6 +45,7 @@ interface Row {
   settledOn: string | null;
   status: string;
   counted: boolean; // false = fora do caixa (a tela ainda soma; só o caixa ignora)
+  bankAccountId: number | null;
   initial: InstallmentInitial;
 }
 
@@ -100,6 +102,7 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
   const { start, end } = monthRange(month);
   const accounts = useLoad(listCounts, []);
   const categories = useLoad(listCategories, []);
+  const bankAccounts = useLoad(listBankAccounts, []);
 
   const items = useLoad<Row[]>(async () => {
     if (kind === 'pagar') {
@@ -115,6 +118,7 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
         settledOn: p.data_pagamento,
         status: p.status,
         counted: p.contabilizar !== false,
+        bankAccountId: p.id_conta_bancaria ?? null,
         initial: {
           accountId: p.id_count,
           descricao: p.descricao ?? '',
@@ -123,6 +127,7 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
           baixa: p.valor_pago,
           dataBaixa: p.data_pagamento,
           contabilizar: p.contabilizar !== false,
+          bankAccountId: p.id_conta_bancaria ?? null,
         },
       }));
     }
@@ -137,6 +142,7 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
       settledOn: r.data_recebimento,
       status: r.status,
       counted: r.contabilizar !== false,
+      bankAccountId: r.id_conta_bancaria ?? null,
       initial: {
         categoryId: r.id_categoria,
         descricao: r.descricao,
@@ -145,6 +151,7 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
         baixa: r.valor_recebido,
         dataBaixa: r.data_recebimento,
         contabilizar: r.contabilizar !== false,
+        bankAccountId: r.id_conta_bancaria ?? null,
       },
     }));
   }, [kind, start, end]);
@@ -188,6 +195,7 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
         valor_pago: data.baixa ?? empty,
         data_pagamento: done ? data.dataBaixa : empty,
         contabilizar: data.contabilizar,
+        id_conta_bancaria: data.bankAccountId ?? empty,
       };
       if (form?.row) await updateInstallment(form.row.id, payload);
       else await createInstallment(payload);
@@ -200,6 +208,7 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
         valor_recebido: data.baixa ?? empty,
         data_recebimento: done ? data.dataBaixa : empty,
         contabilizar: data.contabilizar,
+        id_conta_bancaria: data.bankAccountId ?? empty,
       };
       if (form?.row) await updateReceivable(form.row.id, payload);
       else await createReceivable(payload);
@@ -236,9 +245,19 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
    */
   async function settle(row: Row, data: SettleForm) {
     if (kind === 'pagar') {
-      await updateInstallment(row.id, { valor_parcela: data.valor, valor_pago: data.valor, data_pagamento: data.data });
+      await updateInstallment(row.id, {
+        valor_parcela: data.valor,
+        valor_pago: data.valor,
+        data_pagamento: data.data,
+        id_conta_bancaria: data.bankAccountId ?? null,
+      });
     } else {
-      await updateReceivable(row.id, { valor: data.valor, valor_recebido: data.valor, data_recebimento: data.data });
+      await updateReceivable(row.id, {
+        valor: data.valor,
+        valor_recebido: data.valor,
+        data_recebimento: data.data,
+        id_conta_bancaria: data.bankAccountId ?? null,
+      });
     }
     await items.reload();
   }
@@ -364,6 +383,7 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
           initial={form.row?.initial}
           accounts={accounts.data ?? []}
           categories={categories.data ?? []}
+          bankAccounts={bankAccounts.data ?? []}
           onClose={() => setForm(null)}
           onSubmit={save}
         />
@@ -385,6 +405,8 @@ function InstallmentsPage({ kind }: { kind: InstallmentKind }) {
           title={settleTarget.title}
           expected={settleTarget.value}
           offCash={!settleTarget.counted}
+          bankAccounts={bankAccounts.data ?? []}
+          defaultBankAccountId={settleTarget.bankAccountId}
           onClose={() => setSettleTarget(null)}
           onSubmit={(data) => settle(settleTarget, data)}
         />
