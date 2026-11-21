@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowDownLeft, ArrowUpRight, ChevronRight, CircleDollarSign, Download, Wallet } from 'lucide-react';
 import { PageHeading, PanelHeading } from '../../components/PageHeading';
 import { MonthPicker } from './components';
+import { BANK_KIND_LABEL } from './bankAccounts';
 import { EntryFormModal } from './EntryFormModal';
 import {
   type EntryPayload,
@@ -11,6 +12,7 @@ import {
   getBalance,
   getEvolution,
   getSummary,
+  listBankAccounts,
   listCategories,
 } from '../../api/finance';
 import { currentMonth, formatMoney, monthLabel, monthRange, monthShort, monthTitle } from '../../lib/format';
@@ -28,7 +30,7 @@ function delta(now: number, before: number): number | null {
 }
 
 function deltaLabel(value: number | null): string {
-  if (value === null) return '—';
+  if (value === null) return 'sem mês anterior';
   return `${value > 0 ? '↑' : value < 0 ? '↓' : ''} ${Math.abs(value).toLocaleString('pt-BR')}%`.trim();
 }
 
@@ -45,6 +47,7 @@ export function OverviewPage() {
   const balance = useLoad(() => getBalance(isCurrent ? undefined : end), [month]);
   const evolution = useLoad(() => getEvolution(6), []);
   const categories = useLoad(listCategories, []);
+  const bankAccounts = useLoad(listBankAccounts, []);
 
   async function handleCreate(payload: EntryPayload) {
     await createEntry(payload);
@@ -67,6 +70,8 @@ export function OverviewPage() {
   const toPay = s ? { qtd: s.parcelas.Pendente.qtd + s.parcelas.Atrasada.qtd, total: s.parcelas.Pendente.total + s.parcelas.Atrasada.total } : null;
   const toReceive = s ? { qtd: s.a_receber.Pendente.qtd + s.a_receber.Atrasada.qtd, total: s.a_receber.Pendente.total + s.a_receber.Atrasada.total } : null;
   const error = summary.error ?? balance.error ?? exportError;
+  const accountBalances = (balance.data?.contas ?? []).filter((c) => c.ativa || c.saldo !== 0);
+  const noAccount = balance.data?.sem_conta ?? 0;
 
   return (
     <>
@@ -170,6 +175,39 @@ export function OverviewPage() {
         </section>
       </div>
 
+      {accountBalances.length > 0 && (
+        <section className="panel">
+          <PanelHeading kicker="ONDE ESTÁ O DINHEIRO" title="Saldo por conta" />
+          <div className="account-balances">
+            {accountBalances.map((c) => (
+              <div className="account-balance-row" key={c.id}>
+                <span className="grow">
+                  <strong>{c.nome}</strong>
+                  <small>{BANK_KIND_LABEL[c.tipo] ?? c.tipo}</small>
+                </span>
+                <b className={c.saldo < 0 ? 'negative-text' : ''}>{formatMoney(c.saldo)}</b>
+              </div>
+            ))}
+            {noAccount !== 0 && (
+              <div className="account-balance-row" title="Lançamentos e parcelas sem conta bancária">
+                <span className="grow">
+                  <strong>Sem conta</strong>
+                  <small>Movimentos ainda sem conta bancária</small>
+                </span>
+                <b className={noAccount < 0 ? 'negative-text' : ''}>{formatMoney(noAccount)}</b>
+              </div>
+            )}
+            <div className="account-balance-row is-total">
+              <span className="grow">
+                <strong>Patrimônio</strong>
+                <small>Disponível + investimentos + cartões</small>
+              </span>
+              <b>{formatMoney(balance.data?.patrimonio)}</b>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="panel upcoming-panel">
         <PanelHeading kicker="PRÓXIMO PASSO" title="Contas para acompanhar" />
         <div className="upcoming-cards">
@@ -201,7 +239,12 @@ export function OverviewPage() {
       </section>
 
       {showForm && (
-        <EntryFormModal categories={categories.data ?? []} onClose={() => setShowForm(false)} onSubmit={handleCreate} />
+        <EntryFormModal
+          categories={categories.data ?? []}
+          bankAccounts={bankAccounts.data ?? []}
+          onClose={() => setShowForm(false)}
+          onSubmit={handleCreate}
+        />
       )}
     </>
   );

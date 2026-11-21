@@ -51,7 +51,8 @@ export function NoteFormModal({ note, onClose, onSubmit }: NoteFormModalProps) {
     try {
       await onSubmit({
         titulo: titulo.trim(),
-        descricao: descricao.trim() || undefined,
+        // Na edição, texto apagado vai como "" (igual à nota em tela cheia) para limpar de verdade.
+        descricao: descricao.trim() || (isEditing ? '' : undefined),
         cor,
       });
       onClose();

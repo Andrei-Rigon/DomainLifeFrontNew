@@ -12,6 +12,7 @@ export interface Count {
   tipo: CountType;
   qtde_parceladas: number | null;
   id_categoria_conta: number | null;
+  contabilizar?: boolean; // padrão das parcelas novas (false = paga no cartão, fora do caixa)
   createdAt?: string;
   updatedAt?: string;
 }
@@ -24,6 +25,7 @@ export interface CountPayload {
   valor_pago?: number | null;
   tipo: CountType;
   qtde_parceladas?: number | null;
+  contabilizar?: boolean;
 }
 
 export function listCounts() {

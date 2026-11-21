@@ -9,12 +9,13 @@ export interface Appointment {
   localizacao: string | null;
 }
 
+// null = limpar o campo na edição (a API aceita null nesses campos).
 export interface AppointmentPayload {
   titulo: string;
-  descricao?: string;
+  descricao?: string | null;
   data_evento: string;
-  hora_evento?: string;
-  localizacao?: string;
+  hora_evento?: string | null;
+  localizacao?: string | null;
 }
 
 export function listAppointments(start: string, end: string) {

@@ -17,6 +17,12 @@ export function parseMoneyInput(text: string): number | undefined {
   return Number.isFinite(value) ? value : Number.NaN;
 }
 
+/** Dinheiro -> texto de campo com 2 casas: 23.9 -> "23,90" (o inverso de parseMoneyInput). */
+export function moneyToInput(value: number | string): string {
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toFixed(2).replace('.', ',') : String(value);
+}
+
 export function hasTooManyDecimals(value: number): boolean {
   return Math.round(value * 100) / 100 !== value;
 }
